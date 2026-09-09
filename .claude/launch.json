@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 4200,
+      "autoPort": false
+    },
+    {
+      "name": "web-verify",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["ng", "serve", "--port", "4300"],
+      "port": 4300
+    },
+    {
+      "name": "web-pwa",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "dist/cloudposgrid/browser", "-p", "4400", "-c-1", "--silent"],
+      "port": 4400
+    },
+    {
+      "name": "promo-site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "C:/Users/SEVİL/OneDrive/Desktop/Tanitim-sitesi/dist", "-p", "4500", "-c-1", "--silent"],
+      "port": 4500
+    }
+  ]
+}
