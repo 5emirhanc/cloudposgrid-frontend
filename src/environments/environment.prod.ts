@@ -1,9 +1,11 @@
 export const environment = {
   production: true,
   // API adresi DERLEME ANINDA gömülür — değiştirdikten sonra yeniden build/deploy gerekir.
-  //   Kendi alan adı : https://api.cloudposgrid.com/api
-  //   Render (geçici): https://<render-servis-adi>.onrender.com/api
   // Sonundaki /api şart (backend rotaları /api ile başlıyor), sonda eğik çizgi OLMAMALI.
-  apiUrl: 'https://api.cloudposgrid.com/api',
+  //
+  // ŞU AN: Render'daki ücretsiz geçici dağıtım (canlı ve doğrulandı).
+  // Kendi alan adına geçince burayı 'https://api.cloudposgrid.com/api' yap ve YENİDEN DERLE —
+  // adres derleme anında gömüldüğü için yalnız ortam değişkeni değiştirmek YETMEZ.
+  apiUrl: 'https://cloudposgrid-api.onrender.com/api',
   appName: 'CloudPosGrid',
 };
