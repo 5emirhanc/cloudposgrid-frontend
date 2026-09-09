@@ -17,8 +17,47 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!--
+    Açılış iskeleti. <app-root> içindeki her şeyi Angular bootstrap olunca kendisi siler, bu yüzden
+    burada temizlik yapan bir koda gerek yok. Stil satır içi: harici CSS henüz inmemiş olabilir.
+    Neden gerekli: oturum geri yükleme isteği bootstrap'ı bekletiyor ve ücretsiz barındırmada API
+    uykudan uyanırken bu dakikayı bulabiliyor — iskelet olmasa kullanıcı bomboş beyaz sayfa görür.
+  -->
+  <style>
+    .boot { position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 18px;
+            font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+            background: #f8fafc; color: #0f172a; }
+    .boot__logo { width: 56px; height: 56px; }
+    .boot__name { font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+    .boot__bar { width: 168px; height: 3px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .boot__bar::after { content: ""; display: block; width: 40%; height: 100%; border-radius: 999px;
+                        background: #2563eb; animation: boot-slide 1.15s ease-in-out infinite; }
+    /* Uyanma mesajı ilk saniyelerde görünmez: hızlı açılışta gereksiz yere endişe vermesin. */
+    .boot__hint { font-size: 12.5px; color: #64748b; max-width: 260px; text-align: center;
+                  line-height: 1.5; opacity: 0; animation: boot-fade .4s ease-out 5s forwards; }
+    @keyframes boot-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+    @keyframes boot-fade { to { opacity: 1; } }
+    @media (prefers-color-scheme: dark) {
+      .boot { background: #0f172a; color: #e2e8f0; }
+      .boot__bar { background: #1e293b; }
+      .boot__hint { color: #94a3b8; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .boot__bar::after { animation: none; width: 100%; }
+      .boot__hint { animation: none; opacity: 1; }
+    }
+  </style>
 </head>
 <body>
-  <app-root></app-root>
+  <app-root>
+    <div class="boot">
+      <img class="boot__logo" src="logo.svg" alt="" width="56" height="56">
+      <div class="boot__name">CloudPosGrid</div>
+      <div class="boot__bar" role="progressbar" aria-label="Uygulama yükleniyor"></div>
+      <p class="boot__hint">Sunucu uykudan uyanıyor olabilir; ilk açılış biraz sürebilir.</p>
+    </div>
+  </app-root>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, catchError, finalize, of, shareReplay, tap } from 'rxjs';
+import { Observable, catchError, finalize, of, shareReplay, tap, timeout } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthResponse, BusinessType, UserDto } from './models';
 import { profileFor } from './business-profile';
@@ -118,7 +118,11 @@ export class AuthService {
     // bunu önlüyoruz; tamamlanınca alanı sıfırlayıp sonraki yenilemeye izin veriyoruz.
     if (this.refresh$) return this.refresh$;
     // Refresh token gövdede değil cookie'de gider (interceptor withCredentials ekler).
-    this.refresh$ = this.http.post<AuthResponse>(`${this.api}/auth/refresh`, {}).pipe(
+    // skipErrorToast: yenileme SESSİZ bir işlemdir. Başarısız olduğunda kullanıcı zaten giriş
+    // ekranına düşer; ayrıca "Bir hata oluştu" toast'ı atmak kafa karıştırır. Bu özellikle
+    // açılışta önemli: API uykudaysa/erişilemezse ilk ziyaretçi hiçbir şey yapmadan hata görürdü.
+    // (401 zaten interceptor'da sessiz; buradaki koruma ağ hatası, CORS ve zaman aşımı içindir.)
+    this.refresh$ = this.http.post<AuthResponse>(`${this.api}/auth/refresh`, {}, skipErrorToast()).pipe(
       tap((r) => this.setSession(r)),
       finalize(() => (this.refresh$ = null)),
       shareReplay(1),
@@ -129,6 +133,11 @@ export class AuthService {
   /** Uygulama açılışında sessiz oturum geri yükleme: cookie geçerliyse access token + kullanıcı belleğe alınır. */
   restoreSession(): Observable<AuthResponse | null> {
     return this.refresh().pipe(
+      // Bu çağrı uygulama açılışını BEKLETİR (provideAppInitializer). Ücretsiz barındırmada API
+      // hareketsiz kalınca uykuya daldığı için ilk istek dakikayı bulabilir; süre sınırı olmazsa
+      // kullanıcı o süre boyunca hiçbir şey göremez. Süre aşımında oturumsuz devam ediyoruz:
+      // giriş ekranı açılır, kullanıcı giriş yaptığında API çoktan uyanmış olur.
+      timeout(20_000),
       catchError(() => {
         this.clearSession();
         return of(null);
