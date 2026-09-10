@@ -75,19 +75,32 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   // --- Tenant oturumu ---
-  const isAuthEndpoint =
-    req.url.includes('/auth/login') ||
-    req.url.includes('/auth/register') ||
-    req.url.includes('/auth/refresh');
+  // İki AYRI kavram; tek bayrakta birleştirilemez:
+  //   a) uç Authorization taşımaz mı?
+  //   b) ucun 401'i "token süresi doldu" sayılmalı mı?
+  // Sorgu dizesi ayıklanıp TAM EŞLEŞME kullanılıyor: `includes('/auth/login')` aynı zamanda
+  // `/auth/login-history` ile de eşleşiyordu, o yüzden giriş geçmişi ekranı hiçbir zaman
+  // Authorization başlığı alamıyor ve kalıcı olarak 401 dönüyordu.
+  const path = req.url.split('?')[0];
+
+  const isAnonymousAuthEndpoint =
+    path.endsWith('/auth/login') ||
+    path.endsWith('/auth/register') ||
+    path.endsWith('/auth/refresh');
+
+  // pin-login BURAYA dahil, yukarıya DEĞİL: uç [Authorize] olduğu ve mevcut oturumun işletmesini
+  // kullandığı için token'a ihtiyacı var. Ama yanlış PIN'in 401'i kullanıcı hatasıdır; yenileyip
+  // tekrar denemek paylaşılan POS terminalinde tek yazım hatasıyla tüm oturumu düşürüyordu.
+  const skipRefreshOn401 = isAnonymousAuthEndpoint || path.endsWith('/auth/pin-login');
 
   let authReq = req;
   if (isApi) {
     const token = auth.accessToken;
     const headers: Record<string, string> = {};
-    if (token && !isAuthEndpoint) headers['Authorization'] = `Bearer ${token}`;
+    if (token && !isAnonymousAuthEndpoint) headers['Authorization'] = `Bearer ${token}`;
     // Çok şube: seçili şube başlığı (null ise gönderilmez → birleşik görünüm).
     const bid = branch.currentBranchId();
-    if (bid && !isAuthEndpoint) headers['X-Branch-Id'] = bid;
+    if (bid && !isAnonymousAuthEndpoint) headers['X-Branch-Id'] = bid;
     authReq = req.clone({
       // httpOnly refresh cookie'sinin gönderilip ayarlanabilmesi için tüm API isteklerinde gerekli.
       withCredentials: true,
@@ -98,15 +111,23 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(authReq).pipe(
     catchError((err: HttpErrorResponse) => {
       // Access token süresi dolmuşsa cookie ile sessizce yenile ve isteği bir kez tekrarla.
-      if (err.status === 401 && isApi && !isAuthEndpoint) {
+      if (err.status === 401 && isApi && !skipRefreshOn401) {
         return auth.refresh().pipe(
-          switchMap((r) =>
-            next(authReq.clone({ setHeaders: { Authorization: `Bearer ${r.accessToken}` } }))
-          ),
+          // catchError YALNIZ yenilemeye bağlı olmalı. Önceden switchMap'ten SONRA geliyordu;
+          // o hâlde yenileme BAŞARILI olsa bile tekrarlanan isteğin herhangi bir hatası
+          // (sunucu 500'ü, ağ kopması, iş kuralı hatası) oturumu siliyordu.
           catchError((refreshErr) => {
             auth.clearSession();
+            // Admin (satır 39) ve bayi (satır 65) dallarıyla aynı davranış. Yönlendirme olmadan
+            // kullanıcı ölü oturumla aynı ekranda kalıyordu: authGuard yalnız ebeveyn rotada
+            // canActivate olarak bağlı (canActivateChild yok), bu yüzden uygulama içi gezinmede
+            // yeniden çalışmıyor — yani kendiliğinden kurtarma hiç yoktu.
+            router.navigateByUrl('/giris');
             return throwError(() => refreshErr);
-          })
+          }),
+          switchMap((r) =>
+            next(authReq.clone({ setHeaders: { Authorization: `Bearer ${r.accessToken}` } }))
+          )
         );
       }
       return throwError(() => err);

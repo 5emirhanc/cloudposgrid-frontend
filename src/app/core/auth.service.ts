@@ -123,6 +123,14 @@ export class AuthService {
     // açılışta önemli: API uykudaysa/erişilemezse ilk ziyaretçi hiçbir şey yapmadan hata görürdü.
     // (401 zaten interceptor'da sessiz; buradaki koruma ağ hatası, CORS ve zaman aşımı içindir.)
     this.refresh$ = this.http.post<AuthResponse>(`${this.api}/auth/refresh`, {}, skipErrorToast()).pipe(
+      // Süre sınırı KAYNAĞA bağlı olmalı. Aşağıdaki shareReplay'in ÜSTÜNE konursa isteği
+      // gerçekten iptal etmez (shareReplay varsayılan olarak kaynağa abone kalır): çağıran
+      // vazgeçer, kullanıcı giriş ekranına düşer, sonra geç gelen yanıt setSession'ı çalıştırıp
+      // "giriş ekranındayım ama oturum açık" gibi tutarsız bir duruma yol açar. Burada,
+      // tap'ten önce durduğu için zaman aşımında istek iptal edilir ve setSession hiç çalışmaz.
+      // Ücretsiz barındırmada API uykudan uyanırken bu çağrı dakikayı bulabiliyor; açılışı
+      // (provideAppInitializer) sonsuza kadar bekletmemesi için sınır şart.
+      timeout(20_000),
       tap((r) => this.setSession(r)),
       finalize(() => (this.refresh$ = null)),
       shareReplay(1),
@@ -133,11 +141,9 @@ export class AuthService {
   /** Uygulama açılışında sessiz oturum geri yükleme: cookie geçerliyse access token + kullanıcı belleğe alınır. */
   restoreSession(): Observable<AuthResponse | null> {
     return this.refresh().pipe(
-      // Bu çağrı uygulama açılışını BEKLETİR (provideAppInitializer). Ücretsiz barındırmada API
-      // hareketsiz kalınca uykuya daldığı için ilk istek dakikayı bulabilir; süre sınırı olmazsa
-      // kullanıcı o süre boyunca hiçbir şey göremez. Süre aşımında oturumsuz devam ediyoruz:
-      // giriş ekranı açılır, kullanıcı giriş yaptığında API çoktan uyanmış olur.
-      timeout(20_000),
+      // Süre sınırı refresh()'in içinde (kaynağa bağlı) — buraya konursa isteği iptal etmiyordu.
+      // Süre aşımında ya da hatada oturumsuz devam ediyoruz: giriş ekranı açılır, kullanıcı
+      // giriş yaptığında API çoktan uyanmış olur.
       catchError(() => {
         this.clearSession();
         return of(null);
