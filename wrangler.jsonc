@@ -1,0 +1,27 @@
+// Cloudflare dağıtım yapılandırması.
+//
+// NEDEN GEREKLİ: Cloudflare'in yeni akışı derlemeden sonra `npx wrangler deploy` çalıştırıyor.
+// Klasik Pages akışının aksine burada "çıktı klasörü" diye bir panel ayarı YOK; wrangler
+// nereyi yayınlayacağını yalnız bu dosyadan öğrenir. Dosya olmadan dağıtım "başarılı" görünür
+// ama site kök dizin dahil her adreste 404 döner (birebir bu yaşandı).
+{
+  // Worker'ın adı. Cloudflare'deki mevcut projeyle BİREBİR AYNI olmalı; farklı yazılırsa
+  // ikinci bir Worker oluşur ve site yine boş kalır.
+  "name": "cloudposgrid-frontend",
+
+  // Yalnızca davranış bayraklarını sabitler. Geçmiş bir tarih güvenlidir; İLERİ tarih
+  // wrangler tarafından reddedilir.
+  "compatibility_date": "2025-09-01",
+
+  "assets": {
+    // Angular çıktısı "browser" ALT KLASÖRÜNE yazar (dist/cloudposgrid değil).
+    // Bir üst klasörü göstermek en sık yapılan hata: derleme yeşil, site boş.
+    "directory": "./dist/cloudposgrid/browser",
+
+    // SPA geri-dönüşü: /stok/urunler gibi derin bağlantılar sunucuda dosya olarak yoktur.
+    // Bu ayar olmadan sayfa yenilendiğinde ya da tanıtım sitesinden /giris'e gelindiğinde
+    // 404 alınır. Gerçek dosyalar (JS, ikonlar, manifest) önce eşleştiği için bu kural
+    // yalnız eşleşmeyen yollarda devreye girer.
+    "not_found_handling": "single-page-application"
+  }
+}
