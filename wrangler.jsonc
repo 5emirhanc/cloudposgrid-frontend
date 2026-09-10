@@ -22,6 +22,12 @@
     // Bu ayar olmadan sayfa yenilendiğinde ya da tanıtım sitesinden /giris'e gelindiğinde
     // 404 alınır. Gerçek dosyalar (JS, ikonlar, manifest) önce eşleştiği için bu kural
     // yalnız eşleşmeyen yollarda devreye girer.
+    //
+    // ⚠️ public/_redirects DOSYASINI GERİ EKLEME. Klasik Pages/Netlify'da SPA geri-dönüşü
+    // "/*  /index.html  200" satırıyla yazılır; Workers akışı bu dosyayı da okur ama o kuralı
+    // REDDEDER ve dağıtımı komple başarısız kılar: Workers zaten "/index" ve ".html" eklerini
+    // kendisi kırptığı için kural kendi kendini tetikler ("Infinite loop detected", code 100324).
+    // Aynı işi aşağıdaki ayar yapıyor; iki mekanizma birlikte kullanılamaz.
     "not_found_handling": "single-page-application"
   }
 }

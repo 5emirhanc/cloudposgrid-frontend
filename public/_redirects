@@ -1,6 +1,0 @@
-# SPA geri-dönüş kuralı (Cloudflare Pages / Netlify).
-# Angular tek sayfalık uygulama: /stok/urunler gibi derin bağlantılar sunucuda dosya olarak YOKTUR.
-# Bu kural olmadan sayfa yenilendiğinde ya da tanıtım sitesinden /giris'e gelindiğinde 404 alınır.
-# Gerçek dosyalar (index.html, JS, ngsw-worker.js, ikonlar) önce eşleştiği için bu kural yalnız
-# eşleşmeyen yollarda devreye girer.
-/*    /index.html   200
