@@ -1088,6 +1088,9 @@ export interface TenantAdminDto {
   lastLoginAt?: string;
   productCount: number;
   salesCount: number;
+  /** Bu müşteriyi getiren bayi (varsa). Bağ hep vardı ama panelde hiç görünmüyordu. */
+  dealerId?: string | null;
+  dealerName?: string | null;
 }
 export interface AdminStatsDto {
   totalTenants: number;
@@ -1518,6 +1521,35 @@ export interface DealerSummaryDto {
   activeTenants: number;
   trialTenants: number;
   commissionRate: number;
+  /** Bayinin para durumu — önceden panelde yalnız oran yazıyordu, kazanç hiç görünmüyordu. */
+  totalEarned: number;
+  totalPaid: number;
+  balance: number;
+}
+
+/**
+ * Bayinin para durumu. Komisyon ödeme ANINDA dondurulmuş tutarlardan toplanır; oran sonradan
+ * değişse bile geçmiş hakediş değişmez.
+ */
+export interface DealerEarningsDto {
+  totalEarned: number;
+  totalPaid: number;
+  /** Kalan borç: kazanılan − ödenen. */
+  balance: number;
+  paidInvoiceCount: number;
+}
+export interface DealerPayoutDto {
+  id: string;
+  amount: number;
+  paidAt: string;
+  note?: string | null;
+}
+/** Süper-admin'in bir bayi hakkında gördüğü her şey. */
+export interface DealerDetailDto {
+  dealer: DealerDto;
+  earnings: DealerEarningsDto;
+  tenants: DealerTenantDto[];
+  payouts: DealerPayoutDto[];
 }
 export interface OnboardTenantRequest {
   companyName: string;

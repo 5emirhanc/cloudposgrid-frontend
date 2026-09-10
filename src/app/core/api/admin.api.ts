@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { cleanParams } from '../utils';
-import { ActivateSubscriptionRequest, AdminStatsDto, CreateDealerRequest, DealerDto, PagedResult, SubscriptionRequestDto, TenantAdminDto } from '../models';
+import { ActivateSubscriptionRequest, AdminStatsDto, CreateDealerRequest, DealerDetailDto, DealerDto, DealerPayoutDto, PagedResult, SubscriptionRequestDto, TenantAdminDto } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class AdminApi {
@@ -48,5 +48,28 @@ export class AdminApi {
   }
   setDealerActive(id: string, isActive: boolean) {
     return this.http.post<void>(`${this.base}/dealers/${id}/active`, { isActive });
+  }
+  /** Bayinin tüm tablosu: para durumu + getirdiği müşteriler + ödeme geçmişi. */
+  dealerDetail(id: string) {
+    return this.http.get<DealerDetailDto>(`${this.base}/dealers/${id}`);
+  }
+  /** Bayiye yapılan ödemeyi (hakediş mahsuplaşması) kaydeder. */
+  createDealerPayout(id: string, amount: number, note?: string) {
+    return this.http.post<DealerPayoutDto>(`${this.base}/dealers/${id}/payouts`, { amount, note });
+  }
+  resetDealerPassword(id: string, newPassword: string) {
+    return this.http.post<void>(`${this.base}/dealers/${id}/password`, { newPassword });
+  }
+  /** Bayiyi siler. Ad birebir yazılmalı; kapatılmamış hakediş varsa sunucu reddeder. */
+  deleteDealer(id: string, confirmName: string) {
+    return this.http.request<void>('delete', `${this.base}/dealers/${id}`, { body: { confirmName } });
+  }
+
+  /**
+   * İşletmeyi KALICI siler. Ad birebir eşleşmezse sunucu reddeder — tek tıkla veri kaybını
+   * önleyen asıl koruma burada değil sunucuda; istemci yalnız onayı topluyor.
+   */
+  deleteTenant(id: string, confirmName: string) {
+    return this.http.request<void>('delete', `${this.base}/tenants/${id}`, { body: { confirmName } });
   }
 }

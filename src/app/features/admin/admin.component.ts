@@ -1,8 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 import { AdminApi } from '../../core/api/admin.api';
-import { AdminAuthService } from '../../core/admin-auth.service';
+import { AdminShellComponent } from './admin-shell.component';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { ModalComponent } from '../../shared/modal.component';
@@ -23,27 +22,9 @@ const SECTOR_LABEL: Record<string, string> = {
 
 @Component({
   selector: 'app-admin',
-  imports: [RouterLink, LucideAngularModule, ModalComponent],
+  imports: [LucideAngularModule, ModalComponent, AdminShellComponent],
   template: `
-    <div class="min-h-screen bg-slate-50">
-      <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:px-8">
-        <img src="/logo.svg" class="h-8 w-8 rounded-lg" alt="CloudPosGrid" />
-        <div>
-          <p class="text-sm font-extrabold text-slate-800">Müşteri Yönetim Paneli</p>
-          <p class="text-[10px] uppercase tracking-wider text-slate-400">CloudPosGrid Admin</p>
-        </div>
-        <div class="ml-auto flex items-center gap-3">
-          <span class="hidden text-sm text-slate-500 sm:block">{{ adminEmail() }}</span>
-          <a routerLink="/yonetim/bayiler" class="btn-ghost">
-            <lucide-icon name="store" class="h-4 w-4"></lucide-icon> Bayiler
-          </a>
-          <button class="btn-ghost" (click)="logout()">
-            <lucide-icon name="log-out" class="h-4 w-4"></lucide-icon> Çıkış
-          </button>
-        </div>
-      </header>
-
-      <main class="mx-auto max-w-7xl px-4 py-6 lg:px-8">
+    <app-admin-shell>
 
     <!-- KPI -->
     @if (stats(); as s) {
@@ -130,6 +111,7 @@ const SECTOR_LABEL: Record<string, string> = {
             <th class="px-4 py-3 font-semibold">Bitiş</th>
             <th class="px-4 py-3 text-center font-semibold">Kul.</th>
             <th class="px-4 py-3 font-semibold">Kullanım</th>
+            <th class="px-4 py-3 font-semibold">Bayi</th>
             <th class="px-4 py-3 font-semibold">Kayıt</th>
             <th class="px-4 py-3 text-right font-semibold">İşlem</th>
           </tr>
@@ -150,6 +132,15 @@ const SECTOR_LABEL: Record<string, string> = {
                 <p class="whitespace-nowrap text-slate-700">{{ t.productCount }} ürün · {{ t.salesCount }} satış</p>
                 <p class="text-xs" [class]="t.lastLoginAt ? 'text-slate-400' : 'text-rose-400'">Son giriş: {{ lastSeen(t) }}</p>
               </td>
+              <td class="px-4 py-3">
+                @if (t.dealerName) {
+                  <span class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+                    <lucide-icon name="store" class="h-3 w-3"></lucide-icon> {{ t.dealerName }}
+                  </span>
+                } @else {
+                  <span class="text-xs text-slate-300">Doğrudan</span>
+                }
+              </td>
               <td class="px-4 py-3 text-slate-500">{{ fdate(t.createdAt) }}</td>
               <td class="px-4 py-3">
                 <div class="flex justify-end gap-1">
@@ -159,14 +150,17 @@ const SECTOR_LABEL: Record<string, string> = {
                   <button class="btn-ghost px-2 text-slate-600" title="Süre uzat (+30 gün)" [disabled]="busy()" (click)="extend(t)">
                     <lucide-icon name="clock" class="h-4 w-4"></lucide-icon>
                   </button>
-                  <button class="btn-ghost px-2 text-rose-600" title="Askıya al" [disabled]="busy()" (click)="suspend(t)">
+                  <button class="btn-ghost px-2 text-amber-600" title="Askıya al (geçici kilit, veri durur)" [disabled]="busy()" (click)="suspend(t)">
                     <lucide-icon name="ban" class="h-4 w-4"></lucide-icon>
+                  </button>
+                  <button class="btn-ghost px-2 text-rose-600" title="Kalıcı sil (geri dönüşü yok)" [disabled]="busy()" (click)="openDelete(t)">
+                    <lucide-icon name="trash-2" class="h-4 w-4"></lucide-icon>
                   </button>
                 </div>
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="9" class="px-4 py-10 text-center text-slate-400">Kayıt bulunamadı.</td></tr>
+            <tr><td colspan="10" class="px-4 py-10 text-center text-slate-400">Kayıt bulunamadı.</td></tr>
           }
         </tbody>
       </table>
@@ -184,6 +178,38 @@ const SECTOR_LABEL: Record<string, string> = {
     }
 
     <!-- Aktivasyon modalı -->
+    @if (deleteTarget(); as t) {
+      <app-modal title="İşletmeyi kalıcı olarak sil" (dismiss)="closeDelete()">
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+          <p class="font-semibold">Bu işlem geri alınamaz.</p>
+          <p class="mt-1 leading-relaxed">
+            <span class="font-semibold">{{ t.name }}</span> işletmesinin tüm verisi silinir:
+            satışlar, stok, cariler, faturalar, kullanıcılar ve yüklenen görseller.
+            Yedek alınmaz, geri getirilemez.
+          </p>
+        </div>
+
+        <!-- Geçici kilit isteyen yöneticiyi doğru yere yönlendir: en sık yapılan hata
+             "kapattım" derken kalıcı silmek. -->
+        <p class="mb-4 text-sm text-slate-500">
+          Sadece geçici olarak kapatmak istiyorsan bunun yerine
+          <span class="font-medium text-slate-700">Askıya al</span> kullan — veri durur, sonra geri açılır.
+        </p>
+
+        <label class="label">Onaylamak için işletmenin adını birebir yaz</label>
+        <input class="input" [placeholder]="t.name" [value]="deleteConfirm()"
+          (input)="deleteConfirm.set($any($event.target).value)" />
+
+        <div class="mt-5 flex justify-end gap-2">
+          <button class="btn-ghost" (click)="closeDelete()">Vazgeç</button>
+          <button class="btn-primary !bg-rose-600 hover:!bg-rose-700"
+            [disabled]="busy() || !deleteNameMatches()" (click)="confirmDelete()">
+            {{ busy() ? 'Siliniyor…' : 'Kalıcı olarak sil' }}
+          </button>
+        </div>
+      </app-modal>
+    }
+
     @if (activateTarget(); as t) {
       <app-modal title="Paketi Aktifle / Yenile" (dismiss)="activateTarget.set(null)">
         <p class="mb-4 text-sm text-slate-500">
@@ -220,17 +246,14 @@ const SECTOR_LABEL: Record<string, string> = {
         </div>
       </app-modal>
     }
-      </main>
-    </div>
+    </app-admin-shell>
   `,
 })
 export class AdminComponent implements OnInit {
   private api = inject(AdminApi);
-  private adminAuth = inject(AdminAuthService);
   private confirm = inject(ConfirmService);
   private toast = inject(ToastService);
 
-  protected adminEmail = this.adminAuth.email;
   protected money = money;
   protected fdate = formatDate;
   protected readonly pageSize = 20;
@@ -252,6 +275,16 @@ export class AdminComponent implements OnInit {
   protected search = signal('');
   protected busy = signal(false);
 
+  protected deleteTarget = signal<TenantAdminDto | null>(null);
+  protected deleteConfirm = signal('');
+  /**
+   * Silme butonu, ad birebir yazılana kadar kapalı kalır. Asıl koruma sunucuda (o da aynı
+   * karşılaştırmayı yapıyor); buradaki amaç yöneticinin sildiği kaydı OKUMASINI sağlamak.
+   */
+  protected deleteNameMatches = computed(() =>
+    this.deleteConfirm().trim().toLocaleLowerCase('tr') ===
+    (this.deleteTarget()?.name ?? '').trim().toLocaleLowerCase('tr'));
+
   protected activateTarget = signal<TenantAdminDto | null>(null);
   protected aPlan = signal<TenantPlan>('Pro');
   protected aCycle = signal<BillingCycle>('Monthly');
@@ -262,10 +295,6 @@ export class AdminComponent implements OnInit {
     this.reload();
     this.loadStats();
     this.loadRequests();
-  }
-
-  protected logout(): void {
-    this.adminAuth.logout();
   }
 
   protected statusLabel = (s: TenantStatus) => STATUS_LABEL[s] ?? s;
@@ -358,6 +387,31 @@ export class AdminComponent implements OnInit {
     this.api.extend(t.id, 30).subscribe({
       next: () => { this.busy.set(false); this.toast.success('Süre 30 gün uzatıldı.'); this.refreshAll(); },
       error: () => this.busy.set(false),
+    });
+  }
+
+  protected openDelete(t: TenantAdminDto): void {
+    this.deleteConfirm.set('');
+    this.deleteTarget.set(t);
+  }
+
+  protected closeDelete(): void {
+    this.deleteTarget.set(null);
+    this.deleteConfirm.set('');
+  }
+
+  protected confirmDelete(): void {
+    const t = this.deleteTarget();
+    if (!t || !this.deleteNameMatches()) return;
+    this.busy.set(true);
+    this.api.deleteTenant(t.id, this.deleteConfirm().trim()).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.closeDelete();
+        this.toast.success(`${t.name} kalıcı olarak silindi.`);
+        this.refreshAll();
+      },
+      error: () => this.busy.set(false), // hata mesajını global interceptor gösterir
     });
   }
 
